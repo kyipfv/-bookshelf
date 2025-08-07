@@ -2,7 +2,8 @@ services:
   - type: web
     name: bookshelf
     runtime: node
-    buildCommand: npm install && npm run build && npx prisma generate && npx prisma migrate deploy
+    rootDir: .
+    buildCommand: npm install && cd client && npm install && cd .. && npx prisma generate && npx prisma migrate deploy && npm run client:build
     startCommand: npm run start
     envVars:
       - key: NODE_ENV
@@ -11,7 +12,5 @@ services:
         value: file:./prod.db
       - key: GOOGLE_BOOKS_API_KEY
         sync: false
-      - key: PORT
-        value: 3001
     autoDeploy: true
     plan: free
