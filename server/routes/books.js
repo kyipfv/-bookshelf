@@ -106,14 +106,29 @@ router.post('/upload', upload.array('files', 10), async (req, res) => {
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
+    console.log(`Processing ${files.length} files for visitor ${visitorId}`);
     const results = [];
     const errors = [];
 
     for (const file of files) {
       try {
-        const extractedText = await processImage(file.path);
+        console.log(`Processing file: ${file.originalname}, path: ${file.path}`);
         
+        // Extract text from image
+        const extractedText = await processImage(file.path);
+        console.log(`Extracted text length: ${extractedText.length} characters`);
+        
+        if (!extractedText || extractedText.trim().length < 10) {
+          throw new Error('Could not extract readable text from image. Try a clearer photo with better lighting.');
+        }
+        
+        // Search for books in the extracted text
         const bookDataArray = await searchGoogleBooks(extractedText);
+        console.log(`Found ${bookDataArray.length} potential books`);
+        
+        if (bookDataArray.length === 0) {
+          throw new Error('No books could be identified in the image. Make sure book spines are clearly visible.');
+        }
         
         for (const bookData of bookDataArray) {
           const existingBook = await prisma.book.findFirst({
@@ -136,13 +151,21 @@ router.post('/upload', upload.array('files', 10), async (req, res) => {
               }
             });
             results.push(book);
+            console.log(`Added book: ${bookData.title} by ${bookData.author}`);
+          } else {
+            console.log(`Book already exists: ${bookData.title} by ${bookData.author}`);
           }
         }
       } catch (error) {
         console.error(`Error processing file ${file.filename}:`, error);
-        errors.push({ file: file.originalname, error: error.message });
+        errors.push({ 
+          file: file.originalname, 
+          error: error.message || 'Failed to process image'
+        });
       }
     }
+
+    console.log(`Processing complete: ${results.length} books added, ${errors.length} errors`);
 
     res.json({ 
       success: true, 
@@ -152,7 +175,7 @@ router.post('/upload', upload.array('files', 10), async (req, res) => {
     });
   } catch (error) {
     console.error('Error processing upload:', error);
-    res.status(500).json({ error: 'Failed to process upload' });
+    res.status(500).json({ error: error.message || 'Failed to process upload' });
   }
 });
 

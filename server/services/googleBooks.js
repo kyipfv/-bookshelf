@@ -1,8 +1,15 @@
 import axios from 'axios';
 
 export async function searchGoogleBooks(extractedText) {
+  if (!extractedText || extractedText.trim().length === 0) {
+    console.log('No text provided for book search');
+    return [];
+  }
+
   const books = [];
   const lines = extractedText.split('\n').filter(line => line.trim().length > 3);
+  
+  console.log(`Processing ${lines.length} lines of text`);
   
   const potentialBooks = [];
   for (let i = 0; i < lines.length; i++) {
@@ -18,9 +25,20 @@ export async function searchGoogleBooks(extractedText) {
           potentialBooks.push({ title, author });
         }
       } else {
-        potentialBooks.push({ title: line, author: '' });
+        // Try to identify book-like text (capitalized words, reasonable length)
+        const wordCount = line.split(' ').length;
+        if (wordCount >= 2 && wordCount <= 10 && /^[A-Z]/.test(line)) {
+          potentialBooks.push({ title: line, author: '' });
+        }
       }
     }
+  }
+
+  console.log(`Found ${potentialBooks.length} potential books`);
+
+  if (potentialBooks.length === 0) {
+    // If no books found, return empty array
+    return [];
   }
 
   const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
@@ -31,32 +49,43 @@ export async function searchGoogleBooks(extractedText) {
     
     try {
       const query = author ? `intitle:${title} inauthor:${author}` : `intitle:${title}`;
-      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}${apiKey ? `&key=${apiKey}` : ''}`;
+      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}${apiKey ? `&key=${apiKey}` : ''}&maxResults=1`;
       
+      console.log(`Searching for: "${title}" by "${author || 'unknown'}"`);
       const response = await axios.get(url, { timeout: 5000 });
       
       if (response.data.items && response.data.items.length > 0) {
         const book = response.data.items[0].volumeInfo;
         
-        if (book.title && book.authors) {
+        if (book.title) {
           books.push({
             title: book.title,
-            author: book.authors.join(', '),
+            author: book.authors ? book.authors.join(', ') : author || 'Unknown Author',
             categories: book.categories || [],
             isbn: book.industryIdentifiers?.[0]?.identifier
           });
+          console.log(`Found book: ${book.title}`);
         }
+      } else {
+        console.log(`No results for: "${title}"`);
       }
     } catch (error) {
-      console.error(`Error searching for "${title}" by "${author}":`, error.message);
+      console.error(`Error searching for "${title}":`, error.message);
+      
+      // If API fails, add the book with original data
+      if (title && title.length > 5) {
+        books.push({
+          title: title,
+          author: author || 'Unknown Author',
+          categories: []
+        });
+      }
     }
     
+    // Rate limiting
     await new Promise(resolve => setTimeout(resolve, 200));
   }
 
-  return books.length > 0 ? books : [{
-    title: potentialBooks[0]?.title || 'Unknown Title',
-    author: potentialBooks[0]?.author || 'Unknown Author',
-    categories: []
-  }];
+  console.log(`Returning ${books.length} books`);
+  return books;
 }
