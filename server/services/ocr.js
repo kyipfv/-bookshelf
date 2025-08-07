@@ -1,9 +1,22 @@
 import Tesseract from 'tesseract.js';
 import sharp from 'sharp';
+import path from 'path';
 
 export async function processImage(imagePath) {
   try {
-    const processedImage = await sharp(imagePath)
+    let imageBuffer;
+    const ext = path.extname(imagePath).toLowerCase();
+    
+    // Convert HEIC/HEIF to JPEG first if needed
+    if (ext === '.heic' || ext === '.heif') {
+      imageBuffer = await sharp(imagePath)
+        .jpeg()
+        .toBuffer();
+    } else {
+      imageBuffer = await sharp(imagePath).toBuffer();
+    }
+    
+    const processedImage = await sharp(imageBuffer)
       .resize(2000, null, { 
         withoutEnlargement: true,
         fit: 'inside'

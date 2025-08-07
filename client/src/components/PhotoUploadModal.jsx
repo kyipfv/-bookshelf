@@ -24,7 +24,7 @@ function PhotoUploadModal({ onClose, onSuccess }) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp']
+      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp', '.heic', '.heif', '.HEIC', '.HEIF']
     },
     multiple: true
   });
@@ -103,7 +103,7 @@ function PhotoUploadModal({ onClose, onSuccess }) {
             ) : (
               <>
                 <p className="text-gray-600 mb-2">Drag & drop shelf photos here, or click to select</p>
-                <p className="text-sm text-gray-400">Supports JPG, PNG, GIF, WebP</p>
+                <p className="text-sm text-gray-400">Supports JPG, PNG, GIF, WebP, HEIC (iPhone photos)</p>
               </>
             )}
           </div>
