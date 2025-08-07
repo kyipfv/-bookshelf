@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.local
+dist/
+build/
+*.db
+*.db-journal
+.DS_Store
+uploads/
+client/node_modules/
+client/dist/
+client/.vite/
+coverage/
+*.log
