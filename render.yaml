@@ -13,4 +13,6 @@ services:
         value: file:./prod.db
       - key: GOOGLE_BOOKS_API_KEY
         sync: false
+      - key: CLAUDE_API_KEY
+        sync: false
     autoDeploy: true

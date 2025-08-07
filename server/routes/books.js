@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { PrismaClient } from '@prisma/client';
 import { processImage } from '../services/ocr.js';
+import { extractBooksFromImage } from '../services/claudeVision.js';
 import { searchGoogleBooks } from '../services/googleBooks.js';
 import { mapGenre } from '../utils/genreMapping.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -114,16 +115,46 @@ router.post('/upload', upload.array('files', 10), async (req, res) => {
       try {
         console.log(`Processing file: ${file.originalname}, path: ${file.path}`);
         
-        // Extract text from image
-        const extractedText = await processImage(file.path);
-        console.log(`Extracted text length: ${extractedText.length} characters`);
+        let bookDataArray = [];
         
-        if (!extractedText || extractedText.trim().length < 10) {
-          throw new Error('Could not extract readable text from image. Try a clearer photo with better lighting.');
+        // Try Claude Vision API first if available
+        if (process.env.CLAUDE_API_KEY) {
+          try {
+            const claudeBooks = await extractBooksFromImage(file.path);
+            
+            // Enhance with Google Books metadata
+            for (const book of claudeBooks) {
+              const searchQuery = `${book.title} ${book.author}`;
+              const enhancedBooks = await searchGoogleBooks(searchQuery);
+              
+              if (enhancedBooks.length > 0) {
+                bookDataArray.push(enhancedBooks[0]);
+              } else {
+                // Use Claude's data if Google Books doesn't find it
+                bookDataArray.push({
+                  title: book.title,
+                  author: book.author,
+                  categories: []
+                });
+              }
+            }
+          } catch (claudeError) {
+            console.error('Claude Vision failed, falling back to OCR:', claudeError.message);
+          }
         }
         
-        // Search for books in the extracted text
-        const bookDataArray = await searchGoogleBooks(extractedText);
+        // Fall back to OCR if Claude didn't work or isn't configured
+        if (bookDataArray.length === 0) {
+          const extractedText = await processImage(file.path);
+          console.log(`OCR extracted text length: ${extractedText.length} characters`);
+          
+          if (!extractedText || extractedText.trim().length < 10) {
+            throw new Error('Could not extract readable text from image. Try a clearer photo with better lighting.');
+          }
+          
+          bookDataArray = await searchGoogleBooks(extractedText);
+        }
+        
         console.log(`Found ${bookDataArray.length} potential books`);
         
         if (bookDataArray.length === 0) {
